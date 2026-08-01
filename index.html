@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>For Mantsha</title>
+
+<!-- ===================================================================
+     FOR MANTSHA — a single-file cinematic proposal experience
+     Built as one continuous night: stars → tulips → memories → a letter
+     → a question, asked gently and without pressure.
+     Structure: HTML (markup) → CSS (design system + scenes) → JS (motion)
+=================================================================== -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* =====================================================================
+   DESIGN TOKENS
+   Display face: Cormorant Garamond (the emotional, handwritten-feeling
+   serif — used for anything that should feel spoken, not typed).
+   Body/UI face: Poppins (soft, rounded, modern — used for buttons,
+   labels, small text).
+===================================================================== */
+:root{
+  --navy:        #071C3F;
+  --navy-deep:   #040f28;
+  --accent:      #4DA3FF;
+  --pink:        #FF8FB8;
+  --white:       #FFFFFF;
+  --lavender:    #D7C6FF;
+  --glass:       rgba(255,255,255,0.06);
+  --glass-brd:   rgba(255,255,255,0.14);
+  --shadow-glow: 0 0 60px rgba(77,163,255,0.25);
+
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body:    'Poppins', sans-serif;
+
+  --ease: cubic-bezier(.19,1,.22,1);
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html,body{
+  height:100%;
+  overflow:hidden;
+  background:var(--navy);
+  color:var(--white);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+}
+
+body{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  height:100dvh;
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; }
+}
+
+::selection{ background:var(--pink); color:var(--navy); }
+
+button{ font-family:var(--font-body); border:none; background:none; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+button:focus-visible, a:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; border-radius:8px; }
+
+/* =====================================================================
+   AMBIENT LAYERS — shared across every scene
+   (starfield canvas, floating particles, cursor glow, vignette)
+===================================================================== */
+#bg-sky{
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse at 20% 15%, rgba(77,163,255,0.16), transparent 55%),
+    radial-gradient(ellipse at 85% 75%, rgba(255,143,184,0.10), transparent 50%),
+    linear-gradient(180deg, var(--navy-deep) 0%, var(--navy) 55%, #0a2650 100%);
+  transition: filter 1.2s var(--ease), background 1.6s var(--ease);
+}
+body.bright #bg-sky{ filter:brightness(1.35) saturate(1.15); }
+
+#stars-canvas{ position:fixed; inset:0; z-index:1; pointer-events:none; }
+#particles-canvas{ position:fixed; inset:0; z-index:2; pointer-events:none; }
+
+#cursor-glow{
+  position:fixed; z-index:3; width:280px; height:280px; border-radius:50%;
+  background:radial-gradient(circle, rgba(77,163,255,0.14), transparent 70%);
+  pointer-events:none; transform:translate(-50%,-50%);
+  transition:opacity .4s ease; opacity:0;
+}
+@media (hover:hover){ #cursor-glow.show{ opacity:1; } }
+
+.vignette{
+  position:fixed; inset:0; z-index:4; pointer-events:none;
+  box-shadow: inset 0 0 18vw rgba(2,7,20,0.55);
+}
+
+.grain{
+  position:fixed; inset:0; z-index:5; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* =====================================================================
+   SCENE STAGE
+   Every "page" is a full-viewport scene. Only one is active at a time.
+   Navigation is scene swap, never scroll.
+===================================================================== */
+#stage{ position:relative; z-index:6; width:100%; height:100%; }
+
+.scene{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding: 8vh 7vw;
+  text-align:center;
+  opacity:0; visibility:hidden; pointer-events:none;
+  filter:blur(18px);
+  transform:scale(1.04);
+  transition: opacity .9s var(--ease), filter .9s var(--ease), transform .9s var(--ease);
+}
+.scene.active{
+  opacity:1; visibility:visible; pointer-events:auto;
+  filter:blur(0); transform:scale(1);
+}
+.scene.leaving{
+  opacity:0; filter:blur(18px); transform:scale(0.96);
+}
+
+.eyebrow{
+  font-family:var(--font-body); font-size:11px; letter-spacing:.32em; text-transform:uppercase;
+  color:var(--lavender); opacity:.75; margin-bottom:18px;
+}
+
+h1,h2{ font-family:var(--font-display); font-weight:500; line-height:1.15; }
+
+.scene-title{ font-size:clamp(28px,7vw,44px); margin-bottom:18px; color:var(--white); }
+.scene-body{ font-family:var(--font-display); font-size:clamp(18px,4.6vw,23px); line-height:1.65; color:rgba(255,255,255,0.88); max-width:520px; font-style:italic; }
+.scene-body strong{ color:var(--pink); font-weight:600; font-style:normal; }
+
+/* typing effect helper */
+.type-line{ display:block; white-space:pre-wrap; }
+.type-cursor{ display:inline-block; width:2px; margin-left:2px; background:var(--pink); animation:blink 1s steps(1) infinite; }
+@keyframes blink{ 50%{ opacity:0; } }
+
+/* =====================================================================
+   NAV CONTROLS
+===================================================================== */
+.nav-row{ position:absolute; bottom:6vh; left:0; right:0; display:flex; justify-content:center; gap:14px; z-index:20; }
+
+.btn{
+  font-family:var(--font-body); font-weight:500; font-size:14px; letter-spacing:.02em;
+  padding:15px 34px; border-radius:100px; color:var(--navy);
+  background:linear-gradient(135deg, var(--accent), #7cc0ff);
+  box-shadow:0 8px 30px rgba(77,163,255,0.35);
+  transition:transform .35s var(--ease), box-shadow .35s var(--ease);
+}
+.btn:hover{ transform:translateY(-3px); box-shadow:0 12px 36px rgba(77,163,255,0.5); }
+.btn:active{ transform:translateY(0) scale(.97); }
+
+.btn.ghost{
+  color:var(--white); background:var(--glass); border:1px solid var(--glass-brd);
+  backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+  box-shadow:none;
+}
+.btn.ghost:hover{ background:rgba(255,255,255,0.1); box-shadow:0 8px 26px rgba(0,0,0,0.25); }
+
+.btn.pink{ background:linear-gradient(135deg, var(--pink), #ffb3cf); box-shadow:0 8px 30px rgba(255,143,184,0.4); }
+
+/* progress dots */
+#progress{
+  position:absolute; top:calc(env(safe-area-inset-top, 0px) + 22px); left:0; right:0;
+  display:flex; justify-content:center; gap:6px; z-index:20;
+}
+#progress .dot{ width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,0.22); transition:all .5s var(--ease); }
+#progress .dot.done{ background:var(--accent); }
+#progress .dot.now{ background:var(--pink); width:16px; border-radius:4px; }
+
+/* =====================================================================
+   LOADING SCENE
+===================================================================== */
+#scene-loading{ background:radial-gradient(ellipse at 50% 30%, #0d2a55, var(--navy-deep) 70%); }
+
+.moon{
+  position:relative; width:88px; height:88px; border-radius:50%; margin-bottom:34px;
+  background:radial-gradient(circle at 35% 32%, #fff, #e9ecff 45%, #cfd6ff 100%);
+  box-shadow:0 0 60px rgba(215,198,255,0.55), 0 0 120px rgba(77,163,255,0.25);
+  animation:moon-float 6s ease-in-out infinite;
+}
+.moon::after{
+  content:''; position:absolute; inset:0; border-radius:50%;
+  background:radial-gradient(circle at 65% 60%, rgba(7,28,63,0.18) 0 10px, transparent 11px),
+             radial-gradient(circle at 40% 70%, rgba(7,28,63,0.14) 0 6px, transparent 7px);
+}
+@keyframes moon-float{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
+
+.loading-title{ font-family:var(--font-display); font-size:clamp(30px,8vw,46px); font-style:italic; color:var(--white); margin-bottom:14px; min-height:1.3em; }
+.loading-sub{ font-size:13px; letter-spacing:.05em; color:var(--lavender); opacity:.8; margin-bottom:46px; min-height:1.4em; }
+
+.loading-bar{ width:min(240px,60vw); height:2px; background:rgba(255,255,255,0.12); border-radius:2px; overflow:hidden; margin-bottom:40px; }
+.loading-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent),var(--pink)); border-radius:2px; }
+
+#enter-btn{ opacity:0; transform:translateY(14px); pointer-events:none; transition:all .8s var(--ease); }
+#enter-btn.show{ opacity:1; transform:translateY(0); pointer-events:auto; }
+
+/* =====================================================================
+   TULIP SCENE
+===================================================================== */
+.tulip-stage{ position:relative; width:min(300px,70vw); height:220px; margin-bottom:8px; display:flex; align-items:flex-end; justify-content:center; gap:18px; }
+
+.tulip{ position:relative; width:46px; height:120px; transform-origin:bottom center; opacity:0; transform:scale(.4) translateY(30px); animation:tulip-rise 1.4s var(--ease) forwards; }
+.tulip:nth-child(1){ animation-delay:.15s; }
+.tulip:nth-child(2){ animation-delay:.45s; height:150px; }
+.tulip:nth-child(3){ animation-delay:.75s; }
+@keyframes tulip-rise{ to{ opacity:1; transform:scale(1) translateY(0); } }
+
+.tulip .stem{ position:absolute; bottom:0; left:50%; width:3px; height:70%; background:linear-gradient(180deg,#6fae7a,#3f7b53); transform:translateX(-50%); border-radius:3px; }
+.tulip .leaf{ position:absolute; bottom:14%; left:50%; width:22px; height:10px; background:#4f9166; border-radius:0 100% 0 100%; }
+.tulip .leaf.l{ transform:translateX(-95%) rotate(10deg); }
+.tulip .leaf.r{ transform:translateX(-5%) rotate(-10deg) scaleX(-1); }
+.tulip .bloom{ position:absolute; top:0; left:50%; width:34px; height:44px; transform:translateX(-50%); animation:bloom-sway 4s ease-in-out infinite; }
+.tulip .bloom span{ position:absolute; bottom:0; width:16px; height:34px; background:var(--pink); border-radius:50% 50% 40% 40%; box-shadow:0 0 18px rgba(255,143,184,0.5); }
+.tulip .bloom span:nth-child(1){ left:1px; transform:rotate(-14deg); }
+.tulip .bloom span:nth-child(2){ left:9px; z-index:2; background:#ffa9c7; }
+.tulip .bloom span:nth-child(3){ right:1px; transform:rotate(14deg); }
+@keyframes bloom-sway{ 0%,100%{ transform:translateX(-50%) rotate(0deg); } 50%{ transform:translateX(-50%) rotate(3deg); } }
+
+/* =====================================================================
+   PHOTO GALLERY SCENE
+===================================================================== */
+#scene-gallery{ padding-top:6vh; }
+.gallery-wrap{
+  position:relative; width:100%; max-width:640px; height:52vh; min-height:340px;
+  display:flex; align-items:center; justify-content:center;
+}
+.polaroid{
+  position:absolute; width:min(58vw,220px); background:#fdfaf5; padding:14px 14px 46px;
+  border-radius:6px; box-shadow:0 20px 45px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
+  transition:transform .6s var(--ease), box-shadow .5s ease, opacity .5s ease;
+  cursor:pointer;
+}
+.polaroid .frame{ width:100%; aspect-ratio:1/1.05; overflow:hidden; border-radius:2px; background:#0c2447; }
+.polaroid .frame img{ width:100%; height:100%; object-fit:cover; display:block; filter:saturate(1.03); }
+.polaroid .cap{ position:absolute; left:0; right:0; bottom:12px; text-align:center; font-family:var(--font-display); font-style:italic; font-size:15px; color:#2a2a2a; padding:0 10px; }
+
+.polaroid.pos-0{ transform:translate(-46%,6%) rotate(-9deg) scale(.86); z-index:1; opacity:.75; }
+.polaroid.pos-1{ transform:translate(0,-2%) rotate(-2deg) scale(1); z-index:3; opacity:1; box-shadow:0 26px 60px rgba(0,0,0,0.55), 0 0 40px rgba(77,163,255,0.18); }
+.polaroid.pos-2{ transform:translate(46%,6%) rotate(9deg) scale(.86); z-index:1; opacity:.75; }
+.polaroid.pos-hide{ opacity:0; transform:translate(0,10%) scale(.7); z-index:0; pointer-events:none; }
+
+.polaroid.pos-1:hover{ transform:translate(0,-8%) rotate(0deg) scale(1.04); }
+
+.gallery-hint{ margin-top:22px; font-size:12px; letter-spacing:.06em; color:var(--lavender); opacity:.7; }
+.gallery-arrows{ position:absolute; top:50%; width:100%; display:flex; justify-content:space-between; transform:translateY(-50%); pointer-events:none; z-index:6; }
+.g-arrow{ pointer-events:auto; width:40px; height:40px; border-radius:50%; background:var(--glass); border:1px solid var(--glass-brd); backdrop-filter:blur(10px); color:var(--white); font-size:16px; display:flex; align-items:center; justify-content:center; }
+
+/* =====================================================================
+   CUTE THINGS GRID
+===================================================================== */
+.cute-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; width:100%; max-width:420px; margin-top:6px; }
+.cute-card{
+  background:var(--glass); border:1px solid var(--glass-brd); border-radius:20px; padding:20px 12px;
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  opacity:0; transform:translateY(18px); animation:card-in .7s var(--ease) forwards;
+  position:relative; overflow:hidden;
+}
+.cute-card::before{ content:''; position:absolute; inset:0; background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,0.08) 50%,transparent 70%); transform:translateX(-120%); }
+.cute-card.shine::before{ animation:shine 1.4s ease; }
+@keyframes shine{ to{ transform:translateX(120%); } }
+@keyframes card-in{ to{ opacity:1; transform:translateY(0); } }
+.cute-card .ic{ font-size:26px; }
+.cute-card .lbl{ font-size:12.5px; line-height:1.4; color:rgba(255,255,255,0.85); }
+
+/* =====================================================================
+   ICE CREAM SCENE
+===================================================================== */
+.cone-wrap{ position:relative; width:120px; height:180px; margin-bottom:10px; }
+.scoop{ position:absolute; left:50%; width:92px; height:92px; border-radius:50%; background:radial-gradient(circle at 35% 30%, #fff, #f3d9c0 55%, #e7c19d 100%); transform:translateX(-50%); box-shadow:inset -8px -10px 18px rgba(0,0,0,0.08); }
+.scoop.s1{ top:0; z-index:3; }
+.scoop.s2{ top:26px; width:96px; height:96px; z-index:2; opacity:.96; }
+.chip{ position:absolute; width:6px; height:6px; border-radius:50%; background:#3b2418; }
+.cone{ position:absolute; left:50%; bottom:0; width:0; height:0; border-left:34px solid transparent; border-right:34px solid transparent; border-top:78px solid #d99a52; transform:translateX(-50%); clip-path:polygon(50% 100%,0 0,100% 0); background-image:repeating-linear-gradient(115deg, rgba(0,0,0,0.08) 0 3px, transparent 3px 9px), repeating-linear-gradient(65deg, rgba(0,0,0,0.08) 0 3px, transparent 3px 9px); }
+
+/* =====================================================================
+   LETTER SCENE
+===================================================================== */
+.letter-paper{
+    position:relative;
+    width:min(90vw,480px);
+    max-height:65vh;
+
+    background:linear-gradient(180deg,#fbf6ec,#f4ecd9);
+
+    color:#2c2416;
+
+    border-radius:12px;
+
+    padding:35px;
+
+    overflow-y:auto;
+
+    transform:none;
+
+    box-shadow:0 20px 50px rgba(0,0,0,.35);
+
+    line-height:1.9;
+}
+
+/* =====================================================================
+   FEELINGS SCENE
+===================================================================== */
+#scene-feelings .scene-body{ max-width:460px; }
+
+/* =====================================================================
+   PROPOSAL SCENE
+===================================================================== */
+#scene-proposal{
+
+justify-content:flex-start;
+
+padding-top:90px;
+
+}
+.heart-wrap{ position:relative; width:120px;
+height:110px; margin-bottom:22px; }
+.heart{
+  position:absolute; inset:0; margin:auto; width:90px; height:90px; transform:rotate(45deg);
+  background:linear-gradient(135deg,var(--pink),#ff6fa0);
+  animation:heartbeat 1.6s ease-in-out infinite; box-shadow:0 0 50px rgba(255,143,184,0.5);
+}
+.heart::before,.heart::after{ content:''; position:absolute; width:90px; height:90px; border-radius:50%; background:inherit; }
+.heart::before{ top:-45px; left:0; }
+.heart::after{ top:0; left:-45px; }
+@keyframes heartbeat{ 0%,100%{ transform:rotate(45deg) scale(1); } 25%{ transform:rotate(45deg) scale(1.08); } 40%{ transform:rotate(45deg) scale(0.98); } }
+
+.proposal-buttons{ display:flex; flex-direction:column; gap:14px; margin-top:70px;
+
+margin-top:70px;
+justify-content:center;
+align-items:center;padding-top:30px; width:min(88vw,340px); }
+.proposal-buttons .btn{ width:100%; }
+
+.gentle-reply{ margin-top:26px; max-width:420px; font-family:var(--font-display); font-style:italic; font-size:18px; line-height:1.7; color:var(--lavender); opacity:0; transform:translateY(10px); transition:all .7s var(--ease); }
+.gentle-reply.show{ opacity:1; transform:translateY(0); }
+
+/* =====================================================================
+   ENDING / HIDDEN ENDING
+===================================================================== */
+.firefly{ position:fixed; z-index:7; width:3px; height:3px; border-radius:50%; background:#ffe9a8; box-shadow:0 0 8px 2px rgba(255,233,168,0.8); pointer-events:none; }
+
+.tiny-tulip-btn{
+  margin-top:30px; width:46px; height:46px; display:flex; align-items:center; justify-content:center;
+  font-size:20px; border-radius:50%; background:var(--glass); border:1px solid var(--glass-brd);
+  animation:pulse-soft 2.4s ease-in-out infinite;
+}
+@keyframes pulse-soft{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,143,184,0.35);} 50%{ box-shadow:0 0 0 10px rgba(255,143,184,0);} }
+
+/* =====================================================================
+   FX LAYERS — confetti / hearts / fireworks canvas
+===================================================================== */
+#fx-canvas{ position:fixed; inset:0; z-index:30; pointer-events:none; }
+
+/* =====================================================================
+   MUSIC TOGGLE
+===================================================================== */
+#music-btn{
+  position:fixed; z-index:40; top:calc(env(safe-area-inset-top,0px) + 20px); right:20px;
+  width:42px; height:42px; border-radius:50%; background:var(--glass); border:1px solid var(--glass-brd);
+  backdrop-filter:blur(14px); display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--white);
+}
+#music-btn .bars{ display:flex; align-items:flex-end; gap:2px; height:12px; }
+#music-btn .bars span{ width:2px; background:var(--accent); border-radius:2px; animation:bar 1s ease-in-out infinite; }
+#music-btn .bars span:nth-child(2){ animation-delay:.15s; }
+#music-btn .bars span:nth-child(3){ animation-delay:.3s; }
+#music-btn.paused .bars span{ animation-play-state:paused; height:3px !important; }
+@keyframes bar{ 0%,100%{ height:4px; } 50%{ height:12px; } }
+
+/* =====================================================================
+   RESPONSIVE FINE-TUNING
+===================================================================== */
+@media (max-width:380px){
+  .scene{ padding:6vh 6vw; }
+  .polaroid{ width:52vw; }
+}
+@media (min-width:820px){
+  .scene-body{ max-width:600px; }
+  .letter-paper{ max-width:520px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ambient layers -->
+<div id="bg-sky"></div>
+<canvas id="stars-canvas"></canvas>
+<canvas id="particles-canvas"></canvas>
+<div id="cursor-glow"></div>
+<div class="vignette"></div>
+<div class="grain"></div>
+<canvas id="fx-canvas"></canvas>
+
+<button id="music-btn" aria-label="Toggle music" title="Music">
+  <div class="bars"><span></span><span></span><span></span></div>
+</button>
+<audio id="bg-audio" src="song.mp3" loop></audio>
+
+<div id="progress" aria-hidden="true"></div>
+
+<main id="stage">
+
+  <!-- 1. LOADING -->
+  <section class="scene active" id="scene-loading">
+    <div class="moon"></div>
+    <div class="loading-title"><span id="load-type" class="type-line"></span></div>
+    <div class="loading-sub" id="load-sub">Preparing something made with lots of courage...</div>
+    <div class="loading-bar"><div class="loading-bar-fill" id="load-fill"></div></div>
+    <button class="btn" id="enter-btn">Enter</button>
+  </section>
+
+  <!-- 2. WELCOME -->
+  <section class="scene" id="scene-welcome" data-title="Welcome">
+    <div class="eyebrow">Just a moment</div>
+    <h1 class="scene-title" id="welcome-type"></h1>
+    <p class="scene-body">I promise it'll be worth it.</p>
+    <div class="nav-row"><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 3. TULIP -->
+  <section class="scene" id="scene-tulip" data-title="Tulips">
+    <div class="eyebrow">A small detail I remembered</div>
+    <div class="tulip-stage">
+      <div class="tulip"><div class="stem"></div><div class="leaf l"></div><div class="leaf r"></div><div class="bloom"><span></span><span></span><span></span></div></div>
+      <div class="tulip"><div class="stem"></div><div class="leaf l"></div><div class="leaf r"></div><div class="bloom"><span></span><span></span><span></span></div></div>
+      <div class="tulip"><div class="stem"></div><div class="leaf l"></div><div class="leaf r"></div><div class="bloom"><span></span><span></span><span></span></div></div>
+    </div>
+    <p class="scene-body">I heard tulips are your favorite.<br>So I thought they deserved a place here too.</p>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 4. GALLERY -->
+  <section class="scene" id="scene-gallery" data-title="Gallery">
+    <div class="eyebrow">A few frames worth keeping</div>
+    <div class="gallery-wrap">
+      <div class="gallery-arrows">
+        <button class="g-arrow" id="g-prev" aria-label="Previous photo">‹</button>
+        <button class="g-arrow" id="g-next" aria-label="Next photo">›</button>
+      </div>
+      <div class="polaroid" data-i="0"><div class="frame"><img src="photo1.jpg"alt="A photo of Mantsha"></div><div class="cap">My favorite smile.</div></div>
+      <div class="polaroid" data-i="1"><div class="frame"><img src="photo2.jpg" alt="A photo of Mantsha"></div><div class="cap">This one deserves to be framed.</div></div>
+      <div class="polaroid" data-i="2"><div class="frame"><img src="photo3.jpg" alt="A photo of Mantsha"></div><div class="cap">Some smiles don't need filters.</div></div>
+    </div>
+    <div class="gallery-hint">tap the arrows, or swipe</div>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 5. CUTE THINGS -->
+  <section class="scene" id="scene-cute" data-title="Cute Things">
+    <div class="eyebrow">Cute things about you</div>
+    <div class="cute-grid" id="cute-grid">
+      <div class="cute-card"><div class="ic">🌷</div><div class="lbl">You notice small, gentle things.</div></div>
+      <div class="cute-card"><div class="ic">🌌</div><div class="lbl">Your favorite color says a lot — calm, deep, steady.</div></div>
+      <div class="cute-card"><div class="ic">✨</div><div class="lbl">You have this quiet kind of glow.</div></div>
+      <div class="cute-card"><div class="ic">😊</div><div class="lbl">Your smile changes the whole room.</div></div>
+      <div class="cute-card"><div class="ic">💗</div><div class="lbl">You're kinder than you probably realize.</div></div>
+      <div class="cute-card"><div class="ic">😄</div><div class="lbl">Your laugh is honestly contagious.</div></div>
+    </div>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 6. ICE CREAM -->
+  <section class="scene" id="scene-icecream" data-title="Choco Chips">
+    <div class="eyebrow">One more small detail</div>
+    <div class="cone-wrap">
+      <div class="scoop s2" id="scoop2"></div>
+      <div class="scoop s1" id="scoop1"></div>
+      <div class="cone"></div>
+    </div>
+    <p class="scene-body">I found out choco chips is your favorite.<br>So... I think our first ice cream should definitely be <strong>choco chips</strong>.</p>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 7. LETTER -->
+  <section class="scene" id="scene-letter" data-title="A Letter">
+    <div class="eyebrow">Something I wrote</div>
+    <div class="letter-paper">
+      <span class="letter-greeting">Dear Mantsha,</span>
+      <span class="letter-body" id="letter-type"></span>
+    </div>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 8. FEELINGS -->
+  <section class="scene" id="scene-feelings" data-title="Feelings">
+    <div class="eyebrow">Under the same sky</div>
+    <p class="scene-body">Somewhere between our conversations...<br><br>you became someone really <strong>special</strong> to me.</p>
+    <div class="nav-row"><button class="btn ghost" data-back>Back</button><button class="btn" data-next>Next</button></div>
+  </section>
+
+  <!-- 9. PROPOSAL -->
+  <section class="scene" id="scene-proposal" data-title="A Question">
+    <div class="heart-wrap"><div class="heart"></div></div>
+    <p class="scene-body">
+      I don't know what tomorrow looks like.<br><br>
+      I'm not asking you to forget your past.<br>
+      I'm not asking you to answer today.<br><br>
+      I just wanted to stop hiding how I feel.<br><br>
+      Would you give me a chance to know you a little more?
+    </p>
+    <div class="proposal-buttons">
+      <button class="btn pink" id="btn-yes">YES ❤️</button>
+      <button class="btn ghost" id="btn-slow">LET'S TAKE IT SLOW 🌷</button>
+    </div>
+    <p class="gentle-reply" id="gentle-reply">
+      That's completely okay.<br>Some beautiful things take time.<br>I'll happily respect your pace.
+    </p>
+  </section>
+
+  <!-- 10. ENDING -->
+  <section class="scene" id="scene-ending" data-title="Ending">
+    <div class="eyebrow">Before you go</div>
+    <p class="scene-body">Thank you for reading.<br><br>No matter what happens...<br>I'm really glad I met you.</p>
+    <p style="margin-top:10px; font-size:12px; letter-spacing:.05em; color:var(--lavender); opacity:.55;">before you leave...</p>
+    <button class="tiny-tulip-btn" id="tiny-tulip" aria-label="A small tulip">🌷</button>
+  </section>
+
+  <!-- 11. HIDDEN ENDING -->
+  <section class="scene" id="scene-hidden" data-title="One Last Thing">
+    <div class="eyebrow">One last thing</div>
+    <p class="scene-body">
+      I spent hours making this.<br><br>
+      Not because I had to.<br>
+      But because I genuinely wanted to make you smile.<br><br>
+      If you smiled even once...<br>
+      <strong>every second was worth it.</strong>
+    </p>
+  </section>
+
+</main>
+
+<script>
+/* =====================================================================
+   APP STATE + SCENE ROUTER
+===================================================================== */
+const SCENES = ['scene-loading','scene-welcome','scene-tulip','scene-gallery','scene-cute','scene-icecream','scene-letter','scene-feelings','scene-proposal','scene-ending','scene-hidden'];
+let current = 0;
+const stage = document.getElementById('stage');
+const progressEl = document.getElementById('progress');
+
+// build progress dots (exclude loading + hidden ending from the visible count)
+const trackable = SCENES.slice(1, -1); // welcome..ending
+trackable.forEach((id)=>{
+  const d = document.createElement('div');
+  d.className = 'dot';
+  d.dataset.id = id;
+  progressEl.appendChild(d);
+});
+
+function updateProgress(sceneId){
+  const dots = [...progressEl.children];
+  const idx = trackable.indexOf(sceneId);
+  dots.forEach((d,i)=>{
+    d.classList.toggle('now', i===idx);
+    d.classList.toggle('done', idx>=0 && i<idx);
+  });
+  progressEl.style.opacity = idx===-1 ? '0' : '1';
+}
+
+function goTo(index, {skipAnim=false}={}){
+  if(index<0 || index>=SCENES.length) return;
+  const fromEl = document.getElementById(SCENES[current]);
+  const toEl = document.getElementById(SCENES[index]);
+  if(fromEl === toEl) return;
+
+  fromEl.classList.add('leaving');
+  fromEl.classList.remove('active');
+  setTimeout(()=> fromEl.classList.remove('leaving'), 900);
+
+  // slight delay so the leave/enter cross-fade feels cinematic, not instant
+  requestAnimationFrame(()=>{
+    toEl.classList.add('active');
+  });
+
+  current = index;
+  updateProgress(SCENES[index]);
+  onSceneEnter(SCENES[index]);
+}
+
+document.querySelectorAll('[data-next]').forEach(b=> b.addEventListener('click', ()=> goTo(current+1)));
+document.querySelectorAll('[data-back]').forEach(b=> b.addEventListener('click', ()=> goTo(current-1)));
+
+/* swipe support (mobile-first) */
+let touchX = null;
+stage.addEventListener('touchstart', e=>{ touchX = e.touches[0].clientX; }, {passive:true});
+stage.addEventListener('touchend', e=>{
+  if(touchX===null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if(Math.abs(dx) > 60 && SCENES[current] !== 'scene-gallery' && SCENES[current] !== 'scene-loading'){
+    if(dx < 0) goTo(current+1); else goTo(current-1);
+  }
+  touchX = null;
+}, {passive:true});
+
+/* =====================================================================
+   TYPING EFFECT UTILITY
+===================================================================== */
+function typeInto(el, text, {speed=42, onDone=null}={}){
+  el.textContent = '';
+  const cursor = document.createElement('span');
+  cursor.className = 'type-cursor';
+  cursor.style.height = '1em';
+  let i = 0;
+  el.appendChild(cursor);
+  const timer = setInterval(()=>{
+    if(i < text.length){
+      cursor.insertAdjacentText('beforebegin', text[i]);
+      i++;
+    } else {
+      clearInterval(timer);
+      cursor.remove();
+      if(onDone) onDone();
+    }
+  }, speed);
+}
+
+/* =====================================================================
+   SCENE-SPECIFIC ENTER LOGIC (typing triggers, one-time animations)
+===================================================================== */
+const played = new Set();
+
+function onSceneEnter(id){
+  if(id === 'scene-welcome' && !played.has(id)){
+    played.add(id);
+    typeInto(document.getElementById('welcome-type'), 'Hey Mantsha... please give me just two minutes.', {speed:38});
+  }
+  if(id === 'scene-letter' && !played.has(id)){
+    played.add(id);
+    const letter = `I don't fully know how to start this, so I'll just be honest.
+
+You've become one of the calmer parts of my day — the kind of person I look forward to talking to, without really planning to.
+
+I'm not writing this to change anything about where we stand, or to ask you to feel a certain way. I just wanted you to know, clearly and gently, that you matter to me.
+
+Whatever you decide after this, I'm grateful this letter got written at all.`;
+    setTimeout(()=> typeInto(document.getElementById('letter-type'), letter, {speed:16}), 350);
+  }
+  if(id === 'scene-icecream' && !played.has(id)){
+    played.add(id);
+    scatterChips();
+  }
+  if(id === 'scene-gallery'){
+    layoutGallery();
+  }
+  if(id === 'scene-cute' && !played.has(id)){
+    played.add(id);
+    [...document.querySelectorAll('.cute-card')].forEach((card,i)=>{
+      card.style.animationDelay = (i*0.12)+'s';
+      setTimeout(()=> card.classList.add('shine'), 700 + i*120);
+    });
+  }
+  if(id === 'scene-ending'){
+    spawnFireflies();
+  }
+}
+
+/* choco chips */
+function scatterChips(){
+  const cone = document.querySelector('.cone-wrap');
+  for(let i=0;i<14;i++){
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    const angle = Math.random()*Math.PI*2;
+    const r = 30+Math.random()*32;
+    chip.style.left = (60+Math.cos(angle)*r)+'px';
+    chip.style.top = (30+Math.sin(angle)*r*0.6)+'px';
+    cone.appendChild(chip);
+  }
+}
+
+/* =====================================================================
+   PHOTO GALLERY LOGIC
+===================================================================== */
+const polaroids = [...document.querySelectorAll('.polaroid')];
+let gIndex = 0;
+function layoutGallery(){
+  const n = polaroids.length;
+  polaroids.forEach((p, i)=>{
+    p.classList.remove('pos-0','pos-1','pos-2','pos-hide');
+    const rel = ((i - gIndex) % n + n) % n;
+    if(rel===0) p.classList.add('pos-1');
+    else if(rel===1) p.classList.add('pos-2');
+    else if(rel===n-1) p.classList.add('pos-0');
+    else p.classList.add('pos-hide');
+  });
+}
+document.getElementById('g-next').addEventListener('click', ()=>{ gIndex=(gIndex+1)%polaroids.length; layoutGallery(); });
+document.getElementById('g-prev').addEventListener('click', ()=>{ gIndex=(gIndex-1+polaroids.length)%polaroids.length; layoutGallery(); });
+polaroids.forEach((p)=> p.addEventListener('click', ()=>{
+  const idx = Number(p.dataset.i);
+  gIndex = idx; layoutGallery();
+}));
+
+/* swipe inside gallery specifically */
+const galleryWrap = document.querySelector('.gallery-wrap');
+let gTouchX = null;
+galleryWrap.addEventListener('touchstart', e=>{ gTouchX = e.touches[0].clientX; e.stopPropagation(); }, {passive:true});
+galleryWrap.addEventListener('touchend', e=>{
+  if(gTouchX===null) return;
+  const dx = e.changedTouches[0].clientX - gTouchX;
+  if(Math.abs(dx) > 40){ dx<0 ? document.getElementById('g-next').click() : document.getElementById('g-prev').click(); }
+  gTouchX = null;
+}, {passive:true});
+
+/* =====================================================================
+   LOADING SCREEN SEQUENCE
+===================================================================== */
+window.addEventListener('DOMContentLoaded', ()=>{
+  const loadType = document.getElementById('load-type');
+  const fill = document.getElementById('load-fill');
+  const enterBtn = document.getElementById('enter-btn');
+
+  typeInto(loadType, 'For Mantsha', {speed:90, onDone:()=>{
+    setTimeout(()=>{
+      fill.style.transition = 'width 2.2s var(--ease)';
+      fill.style.width = '100%';
+    }, 250);
+    setTimeout(()=>{
+      enterBtn.classList.add('show');
+    }, 2200);
+  }});
+});
+
+document.getElementById('enter-btn').addEventListener('click', ()=>{
+  goTo(1);
+  tryPlayAudio();
+});
+
+/* =====================================================================
+   PROPOSAL LOGIC
+===================================================================== */
+document.getElementById('btn-yes').addEventListener('click', ()=>{
+  document.body.classList.add('bright');
+  fireHearts();
+  fireConfetti();
+  fireFireworks();
+  setTimeout(()=> goTo(SCENES.indexOf('scene-ending')), 2600);
+});
+document.getElementById('btn-slow').addEventListener('click', (e)=>{
+  document.getElementById('gentle-reply').classList.add('show');
+  e.target.style.opacity = '0.55';
+  e.target.disabled = true;
+  setTimeout(()=> goTo(SCENES.indexOf('scene-ending')), 3200);
+});
+
+/* =====================================================================
+   HIDDEN ENDING
+===================================================================== */
+document.getElementById('tiny-tulip').addEventListener('click', ()=>{
+  goTo(SCENES.indexOf('scene-hidden'));
+});
+
+/* =====================================================================
+   MUSIC TOGGLE
+===================================================================== */
+const audio = document.getElementById('bg-audio');
+
+document.getElementById("enter-btn").addEventListener("click", async () => {
+    try {
+        audio.volume = 0.2;
+        await audio.play();
+    } catch (e) {
+        console.log(e);
+    }
+});
+const musicBtn = document.getElementById('music-btn');
+let audioOn = false;
+function tryPlayAudio() {
+    audio.volume = 0.2;
+
+    audio.play().then(() => {
+        audioOn = true;
+        musicBtn.classList.remove("paused");
+        console.log("Music Playing ✅");
+    }).catch(err => {
+        console.error("Audio Error:", err);
+        alert(err.message);
+    });
+}
+/* =====================================================================
+   STARFIELD (canvas, ambient, lightweight)
+===================================================================== */
+const starsCanvas = document.getElementById('stars-canvas');
+const sctx = starsCanvas.getContext('2d');
+let stars = [];
+function resizeCanvases(){
+  [starsCanvas, document.getElementById('particles-canvas'), document.getElementById('fx-canvas')].forEach(c=>{
+    c.width = window.innerWidth * devicePixelRatio;
+    c.height = window.innerHeight * devicePixelRatio;
+    c.style.width = window.innerWidth+'px';
+    c.style.height = window.innerHeight+'px';
+  });
+  initStars();
+}
+function initStars(){
+  const count = Math.min(120, Math.floor(window.innerWidth/6));
+  stars = Array.from({length:count}, ()=> ({
+    x: Math.random()*window.innerWidth,
+    y: Math.random()*window.innerHeight*0.75,
+    r: Math.random()*1.4+0.3,
+    tw: Math.random()*Math.PI*2,
+    speed: Math.random()*0.02+0.008
+  }));
+}
+function drawStars(t){
+  sctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  sctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  stars.forEach(s=>{
+    const alpha = 0.35 + Math.abs(Math.sin(s.tw + t*s.speed))*0.65;
+    sctx.beginPath();
+    sctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    sctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    sctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+
+/* =====================================================================
+   FLOATING PARTICLES (hearts + tulip petals drifting gently)
+===================================================================== */
+const pCanvas = document.getElementById('particles-canvas');
+const pctx = pCanvas.getContext('2d');
+let particles = [];
+function spawnParticle(){
+  const kind = Math.random() > 0.55 ? 'heart' : 'petal';
+  particles.push({
+    kind,
+    x: Math.random()*window.innerWidth,
+    y: window.innerHeight + 20,
+    size: 6+Math.random()*8,
+    speed: 0.3+Math.random()*0.5,
+    drift: (Math.random()-0.5)*0.6,
+    rot: Math.random()*Math.PI,
+    rotSpeed: (Math.random()-0.5)*0.02,
+    opacity: 0.15+Math.random()*0.25
+  });
+  if(particles.length > 40) particles.shift();
+}
+function drawParticles(){
+  pctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  pctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  particles.forEach(p=>{
+    p.y -= p.speed; p.x += p.drift; p.rot += p.rotSpeed;
+    pctx.save();
+    pctx.translate(p.x,p.y);
+    pctx.rotate(p.rot);
+    pctx.globalAlpha = p.opacity;
+    if(p.kind==='heart'){
+      pctx.fillStyle = '#FF8FB8';
+      drawHeartPath(pctx, p.size);
+    } else {
+      pctx.fillStyle = '#D7C6FF';
+      pctx.beginPath();
+      pctx.ellipse(0,0,p.size*0.5,p.size*0.8,0,0,Math.PI*2);
+      pctx.fill();
+    }
+    pctx.restore();
+  });
+  particles = particles.filter(p=> p.y > -30);
+  requestAnimationFrame(drawParticles);
+}
+function drawHeartPath(ctx,s){
+  ctx.beginPath();
+  ctx.moveTo(0,s*0.3);
+  ctx.bezierCurveTo(s*0.6,-s*0.4, s*1.1,s*0.3, 0,s*1.1);
+  ctx.bezierCurveTo(-s*1.1,s*0.3, -s*0.6,-s*0.4, 0,s*0.3);
+  ctx.fill();
+}
+setInterval(spawnParticle, 900);
+
+/* =====================================================================
+   FX CANVAS — confetti / fireworks / floating hearts burst on YES
+===================================================================== */
+const fxCanvas = document.getElementById('fx-canvas');
+const fctx = fxCanvas.getContext('2d');
+let fxParticles = [];
+
+function fireConfetti(){
+  const colors = ['#4DA3FF','#FF8FB8','#D7C6FF','#FFFFFF'];
+  for(let i=0;i<80;i++){
+    fxParticles.push({
+      type:'confetti',
+      x: window.innerWidth/2, y: window.innerHeight*0.35,
+      vx:(Math.random()-0.5)*9, vy:(Math.random()-1.6)*9,
+      g:0.22, size:4+Math.random()*4, color:colors[i%colors.length],
+      rot:Math.random()*Math.PI, rotSpeed:(Math.random()-0.5)*0.3, life:140
+    });
+  }
+}
+function fireHearts(){
+  for(let i=0;i<24;i++){
+    fxParticles.push({
+      type:'heart',
+      x: window.innerWidth/2 + (Math.random()-0.5)*120, y: window.innerHeight*0.55,
+      vx:(Math.random()-0.5)*2, vy:-1.4-Math.random()*1.6,
+      size:8+Math.random()*10, color: Math.random()>0.5 ? '#FF8FB8' : '#D7C6FF',
+      life: 200, opacity:1
+    });
+  }
+}
+function fireFireworks(){
+  const bursts = 3;
+  for(let b=0;b<bursts;b++){
+    setTimeout(()=>{
+      const cx = window.innerWidth*(0.25+Math.random()*0.5);
+      const cy = window.innerHeight*(0.2+Math.random()*0.25);
+      const colors = ['#4DA3FF','#FF8FB8','#D7C6FF','#FFFFFF'];
+      const color = colors[Math.floor(Math.random()*colors.length)];
+      for(let i=0;i<36;i++){
+        const angle = (Math.PI*2/36)*i;
+        const speed = 2+Math.random()*2.4;
+        fxParticles.push({
+          type:'spark', x:cx, y:cy,
+          vx:Math.cos(angle)*speed, vy:Math.sin(angle)*speed,
+          g:0.05, size:2.4, color, life:70, opacity:1
+        });
+      }
+    }, b*450);
+  }
+}
+
+function drawFX(){
+  fctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  fctx.clearRect(0,0,window.innerWidth,window.innerHeight);
+  fxParticles.forEach(p=>{
+    p.x += p.vx; p.y += p.vy;
+    if(p.g) p.vy += p.g;
+    p.life--;
+    if(p.type==='confetti'){
+      p.rot += p.rotSpeed;
+      fctx.save(); fctx.translate(p.x,p.y); fctx.rotate(p.rot);
+      fctx.globalAlpha = Math.max(p.life/140,0);
+      fctx.fillStyle = p.color; fctx.fillRect(-p.size/2,-p.size/2,p.size,p.size*0.6);
+      fctx.restore();
+    } else if(p.type==='heart'){
+      fctx.save(); fctx.translate(p.x,p.y);
+      fctx.globalAlpha = Math.max(p.life/200,0);
+      fctx.fillStyle = p.color; drawHeartPath(fctx, p.size);
+      fctx.restore();
+    } else if(p.type==='spark'){
+      fctx.globalAlpha = Math.max(p.life/70,0);
+      fctx.beginPath(); fctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      fctx.fillStyle = p.color; fctx.fill();
+    }
+  });
+  fxParticles = fxParticles.filter(p=> p.life > 0);
+  requestAnimationFrame(drawFX);
+}
+
+/* =====================================================================
+   FIREFLIES (DOM-based, ending scene)
+===================================================================== */
+function spawnFireflies(){
+  if(document.querySelectorAll('.firefly').length > 0) return;
+  for(let i=0;i<16;i++){
+    const f = document.createElement('div');
+    f.className = 'firefly';
+    f.style.left = Math.random()*100+'vw';
+    f.style.top = (20+Math.random()*60)+'vh';
+    f.style.animation = `firefly-float ${6+Math.random()*6}s ease-in-out ${Math.random()*3}s infinite`;
+    document.body.appendChild(f);
+  }
+}
+const styleTag = document.createElement('style');
+styleTag.textContent = `@keyframes firefly-float{0%,100%{transform:translate(0,0);opacity:.2;}25%{opacity:1;}50%{transform:translate(18px,-26px);opacity:.5;}75%{opacity:.9;}}`;
+document.head.appendChild(styleTag);
+
+/* =====================================================================
+   CURSOR GLOW (desktop only, ignored on touch)
+===================================================================== */
+const glow = document.getElementById('cursor-glow');
+window.addEventListener('pointermove', (e)=>{
+  if(e.pointerType && e.pointerType !== 'mouse') return;
+  glow.style.left = e.clientX+'px';
+  glow.style.top = e.clientY+'px';
+  glow.classList.add('show');
+});
+
+/* =====================================================================
+   INIT
+===================================================================== */
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+requestAnimationFrame(drawStars);
+requestAnimationFrame(drawParticles);
+requestAnimationFrame(drawFX);
+updateProgress(SCENES[0]);
+</script>
+</body>
+</html>
